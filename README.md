@@ -1,36 +1,71 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LifeOS
 
-## Getting Started
+Personal life operating system — a single app for tasks, time, habits, journal, study, goals, and finance.
 
-First, run the development server:
+## Stack
+
+- **Next.js 14** (App Router) + **TypeScript**
+- **Tailwind CSS** + **shadcn/ui** (`new-york` style, `slate` base color)
+- **Prisma 6** + **SQLite** (local dev)
+- **NextAuth v5** + `@auth/prisma-adapter`
+- `zod`, `zustand`, `recharts`, `date-fns`, `lucide-react`, `bcryptjs`
+
+## Folder layout
+
+```
+app/          Next.js routes (App Router)
+components/   Shared UI (sidebar, etc.) + shadcn primitives under components/ui
+features/     Feature modules — one folder per domain (tasks, habits, journal, ...)
+lib/          Utilities, db client, auth config
+types/        Shared TypeScript types
+prisma/       Prisma schema + SQLite dev database
+```
+
+## Prerequisites
+
+- Node.js 18.18+ (22 recommended)
+- npm 10+
+
+## Setup
+
+```bash
+# 1. Install deps
+npm install
+
+# 2. Copy the env file and fill in values
+cp .env.example .env
+
+# 3. Create the SQLite database + generate the Prisma client
+npx prisma migrate dev --name init
+```
+
+`DATABASE_URL` is preset to `file:./dev.db`, which puts the SQLite file at `prisma/dev.db`.
+
+## Run
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then open [http://localhost:3000](http://localhost:3000). You should see the sidebar shell with Dashboard / Tasks / Time / Habits / Journal / Study / Goals / Finance / Settings.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Useful scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run dev        # start Next.js dev server
+npm run build      # production build
+npm run start      # serve the production build
+npm run lint       # eslint
 
-## Learn More
+npx prisma studio            # open Prisma Studio (db GUI)
+npx prisma migrate dev       # create + apply a migration
+npx prisma generate          # regenerate the Prisma client
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Adding shadcn components
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npx shadcn@latest add button card input
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The shadcn config lives in `components.json`; generated primitives go in `components/ui/`.

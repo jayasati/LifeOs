@@ -26,7 +26,13 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
+.env
 .env*.local
+
+# prisma / sqlite
+/prisma/*.db
+/prisma/*.db-journal
+/prisma/migrations/dev.db*
 
 # vercel
 .vercel
@@ -34,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.claude
+idea
