@@ -184,17 +184,21 @@ model Habit {
   id            String         @id @default(cuid())
   userId        String
   name          String
+  description   String?
+  icon          String?
   frequency     HabitFrequency @default(DAILY)
   targetPerWeek Int?
   color         String?
   currentStreak Int            @default(0)
   longestStreak Int            @default(0)
   archivedAt    DateTime?
+  createdAt     DateTime       @default(now())
 
   user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   logs HabitLog[]
 
   @@index([userId])
+  @@index([userId, archivedAt])
 }
 
 model HabitLog {
