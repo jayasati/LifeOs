@@ -1,7 +1,8 @@
 import { addDays } from "date-fns";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { DayCheck } from "@/features/habits/components/day-check";
 import { AddHabitDialog } from "@/features/habits/components/add-habit-dialog";
+import { HabitRowMenu } from "@/features/habits/components/habit-row-menu";
 import {
   HABIT_COLOR_HEX,
   type HabitColor,
@@ -90,17 +91,24 @@ function Row({ row, weekStart }: { row: HabitWeekRow; weekStart: Date }) {
             date={addDays(weekStart, i)}
             done={done}
             future={row.future[i]}
+            required={row.required[i]}
             color={row.color}
           />
         </div>
       ))}
 
       <div className="px-2">
-        <div
-          className="mb-1 text-[12px] font-semibold"
-          style={{ color: hex }}
-        >
-          {row.percent}%
+        <div className="mb-1 flex items-baseline justify-between gap-2">
+          <span className="text-[12px] font-semibold" style={{ color: hex }}>
+            {row.percent}%
+          </span>
+          <span className="text-[10px] text-muted-foreground-strong">
+            {row.frequency === "WEEKLY"
+              ? `${row.doneThisWeek} / ${row.weeklyTarget} wk`
+              : row.frequency === "CUSTOM"
+                ? `${row.doneThisWeek} / ${row.weeklyTarget} days`
+                : `${row.doneThisWeek} / 7`}
+          </span>
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
           <div
@@ -110,13 +118,18 @@ function Row({ row, weekStart }: { row: HabitWeekRow; weekStart: Date }) {
         </div>
       </div>
 
-      <button
-        type="button"
-        className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground-strong transition-colors hover:bg-surface-2 hover:text-foreground"
-        aria-label="More"
-      >
-        <MoreHorizontal className="h-4 w-4" />
-      </button>
+      <HabitRowMenu
+        habit={{
+          id: row.id,
+          name: row.name,
+          description: row.description,
+          icon: row.icon,
+          color: row.color,
+          frequency: row.frequency,
+          targetPerWeek: row.targetPerWeek,
+          customDays: row.customDays,
+        }}
+      />
     </div>
   );
 }

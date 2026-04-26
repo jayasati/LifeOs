@@ -188,6 +188,7 @@ model Habit {
   icon          String?
   frequency     HabitFrequency @default(DAILY)
   targetPerWeek Int?
+  customDays    Int[]          @default([])
   color         String?
   currentStreak Int            @default(0)
   longestStreak Int            @default(0)

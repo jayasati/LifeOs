@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,22 +20,61 @@ import {
   HABIT_COLORS,
   HABIT_COLOR_HEX,
   HABIT_ICONS,
+  WEEKDAYS,
   type Frequency,
   type HabitColor,
 } from "@/features/habits/schema";
-import { createHabit } from "@/features/habits/server/actions";
+import { createHabit, updateHabit } from "@/features/habits/server/actions";
 
-const formSchema = z.object({
-  name: z.string().min(1, "Required").max(80),
-  description: z.string().max(200).optional(),
-  icon: z.string(),
-  color: z.enum(HABIT_COLORS),
-  frequency: z.enum(FREQUENCIES),
-});
+const formSchema = z
+  .object({
+    name: z.string().min(1, "Required").max(80),
+    description: z.string().max(200).optional(),
+    icon: z.string(),
+    color: z.enum(HABIT_COLORS),
+    frequency: z.enum(FREQUENCIES),
+    targetPerWeek: z.number().int().min(1).max(7),
+    customDays: z.array(z.number().int().min(0).max(6)),
+  })
+  .superRefine((v, ctx) => {
+    if (v.frequency === "CUSTOM" && v.customDays.length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["customDays"],
+        message: "Pick at least one day",
+      });
+    }
+  });
 type FormValues = z.infer<typeof formSchema>;
 
-export function AddHabitDialog({ trigger }: { trigger?: ReactNode }) {
-  const [open, setOpen] = useState(false);
+type Initial = {
+  id: string;
+  name: string;
+  description?: string | null;
+  icon: string;
+  color: string;
+  frequency: Frequency;
+  targetPerWeek: number | null;
+  customDays: number[];
+};
+
+export function AddHabitDialog({
+  trigger,
+  mode = "create",
+  initial,
+  open: controlledOpen,
+  onOpenChange: setControlledOpen,
+}: {
+  trigger?: ReactNode;
+  mode?: "create" | "edit";
+  initial?: Initial;
+  open?: boolean;
+  onOpenChange?: (v: boolean) => void;
+}) {
+  const [uncontrolled, setUncontrolled] = useState(false);
+  const open = controlledOpen ?? uncontrolled;
+  const setOpen = setControlledOpen ?? setUncontrolled;
+
   const [pending, start] = useTransition();
   const {
     register,
@@ -46,38 +85,81 @@ export function AddHabitDialog({ trigger }: { trigger?: ReactNode }) {
     formState: { errors },
   } = useForm<FormValues>({
     defaultValues: {
-      name: "",
-      description: "",
-      icon: "🌱",
-      color: "purple",
-      frequency: "DAILY",
+      name: initial?.name ?? "",
+      description: initial?.description ?? "",
+      icon: initial?.icon ?? "🌱",
+      color: (initial?.color as HabitColor) ?? "purple",
+      frequency: initial?.frequency ?? "DAILY",
+      targetPerWeek: initial?.targetPerWeek ?? 3,
+      customDays: initial?.customDays ?? [],
     },
     resolver: zodResolver(formSchema),
   });
 
+  useEffect(() => {
+    if (!open) return;
+    if (mode === "edit" && initial) {
+      reset({
+        name: initial.name,
+        description: initial.description ?? "",
+        icon: initial.icon,
+        color: (initial.color as HabitColor) ?? "purple",
+        frequency: initial.frequency,
+        targetPerWeek: initial.targetPerWeek ?? 3,
+        customDays: initial.customDays,
+      });
+    } else if (mode === "create") {
+      reset({
+        name: "",
+        description: "",
+        icon: "🌱",
+        color: "purple",
+        frequency: "DAILY",
+        targetPerWeek: 3,
+        customDays: [],
+      });
+    }
+  }, [open, mode, initial, reset]);
+
   const icon = watch("icon");
   const color = watch("color");
   const frequency = watch("frequency");
+  const targetPerWeek = watch("targetPerWeek");
+  const customDays = watch("customDays");
+
+  function toggleDay(day: number) {
+    const next = customDays.includes(day)
+      ? customDays.filter((d) => d !== day)
+      : [...customDays, day].sort((a, b) => a - b);
+    setValue("customDays", next, { shouldDirty: true, shouldValidate: true });
+  }
 
   function onSubmit(v: FormValues) {
     start(async () => {
-      await createHabit({
+      const payload = {
         name: v.name.trim(),
         description: v.description?.trim() || null,
         icon: v.icon,
         color: v.color,
         frequency: v.frequency,
-        targetPerWeek: null,
-      });
-      reset();
+        targetPerWeek: v.frequency === "WEEKLY" ? v.targetPerWeek : null,
+        customDays: v.frequency === "CUSTOM" ? v.customDays : [],
+      };
+      if (mode === "edit" && initial) {
+        await updateHabit({ id: initial.id, ...payload });
+      } else {
+        await createHabit(payload);
+      }
       setOpen(false);
     });
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ?? (
+      {trigger !== undefined ? (
+        <DialogTrigger asChild>{trigger}</DialogTrigger>
+      ) : controlledOpen === undefined ? (
+        <DialogTrigger asChild>
           <button
             type="button"
             className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-[8px] bg-primary px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-primary-soft"
@@ -85,11 +167,13 @@ export function AddHabitDialog({ trigger }: { trigger?: ReactNode }) {
             <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
             Add Habit
           </button>
-        )}
-      </DialogTrigger>
+        </DialogTrigger>
+      ) : null}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add a new habit</DialogTitle>
+          <DialogTitle>
+            {mode === "edit" ? "Edit habit" : "Add a new habit"}
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="mt-2 space-y-4">
           <Field label="Name" error={errors.name?.message}>
@@ -101,10 +185,7 @@ export function AddHabitDialog({ trigger }: { trigger?: ReactNode }) {
           </Field>
 
           <Field label="Description (optional)">
-            <Input
-              placeholder="30 mins workout"
-              {...register("description")}
-            />
+            <Input placeholder="30 mins workout" {...register("description")} />
           </Field>
 
           <Field label="Icon">
@@ -175,6 +256,61 @@ export function AddHabitDialog({ trigger }: { trigger?: ReactNode }) {
             </div>
           </Field>
 
+          {frequency === "WEEKLY" && (
+            <Field
+              label={`Target: ${targetPerWeek} ${targetPerWeek === 1 ? "time" : "times"} per week`}
+            >
+              <input
+                type="range"
+                min={1}
+                max={7}
+                step={1}
+                value={targetPerWeek}
+                onChange={(e) =>
+                  setValue("targetPerWeek", Number(e.target.value), {
+                    shouldDirty: true,
+                  })
+                }
+                className="w-full accent-violet-500"
+              />
+              <div className="mt-1 text-[11px] text-muted-foreground-strong">
+                Hit at least {targetPerWeek}× any day of the week to keep your
+                streak.
+              </div>
+            </Field>
+          )}
+
+          {frequency === "CUSTOM" && (
+            <Field
+              label="Days of week"
+              error={errors.customDays?.message as string | undefined}
+            >
+              <div className="flex flex-wrap gap-1.5">
+                {WEEKDAYS.map((label, idx) => {
+                  const active = customDays.includes(idx);
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => toggleDay(idx)}
+                      className={cn(
+                        "min-w-[44px] rounded-md border px-2.5 py-1.5 text-[12px] font-medium transition-colors",
+                        active
+                          ? "border-primary bg-primary/15 text-primary-soft"
+                          : "border-border text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-1 text-[11px] text-muted-foreground-strong">
+                Other days are skipped — they don&apos;t affect your streak.
+              </div>
+            </Field>
+          )}
+
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
@@ -188,7 +324,11 @@ export function AddHabitDialog({ trigger }: { trigger?: ReactNode }) {
               disabled={pending}
               className="rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-primary-soft disabled:opacity-60"
             >
-              {pending ? "Saving…" : "Add habit"}
+              {pending
+                ? "Saving…"
+                : mode === "edit"
+                  ? "Save changes"
+                  : "Add habit"}
             </button>
           </div>
         </form>

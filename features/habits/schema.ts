@@ -47,12 +47,33 @@ export const HABIT_ICONS = [
 export const FREQUENCIES = ["DAILY", "WEEKLY", "CUSTOM"] as const;
 export type Frequency = (typeof FREQUENCIES)[number];
 
-export const createHabitSchema = z.object({
-  name: z.string().min(1, "Required").max(80),
-  description: z.string().max(200).optional().nullable(),
-  icon: z.string().max(8).default("🌱"),
-  color: z.enum(HABIT_COLORS).default("purple"),
-  frequency: z.enum(FREQUENCIES).default("DAILY"),
-  targetPerWeek: z.number().int().min(1).max(7).optional().nullable(),
-});
+// Mon=0 ... Sun=6
+export const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+
+export const createHabitSchema = z
+  .object({
+    name: z.string().min(1, "Required").max(80),
+    description: z.string().max(200).optional().nullable(),
+    icon: z.string().max(8).default("🌱"),
+    color: z.enum(HABIT_COLORS).default("purple"),
+    frequency: z.enum(FREQUENCIES).default("DAILY"),
+    targetPerWeek: z.number().int().min(1).max(7).optional().nullable(),
+    customDays: z.array(z.number().int().min(0).max(6)).default([]),
+  })
+  .superRefine((val, ctx) => {
+    if (val.frequency === "WEEKLY" && (val.targetPerWeek ?? 0) < 1) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["targetPerWeek"],
+        message: "Pick a target",
+      });
+    }
+    if (val.frequency === "CUSTOM" && val.customDays.length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["customDays"],
+        message: "Pick at least one day",
+      });
+    }
+  });
 export type CreateHabitInput = z.input<typeof createHabitSchema>;

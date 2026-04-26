@@ -11,17 +11,32 @@ export function DayCheck({
   date,
   done,
   future,
+  required = true,
   color,
 }: {
   habitId: string;
   date: Date;
   done: boolean;
   future: boolean;
+  /** false = this weekday is not part of the habit's schedule (CUSTOM mode) */
+  required?: boolean;
   color: string;
 }) {
   const [, start] = useTransition();
   const [optimistic, setOptimistic] = useOptimistic(done);
   const hex = HABIT_COLOR_HEX[(color as HabitColor) ?? "purple"] ?? "#7c5cf6";
+
+  // Non-required days render as a small dash and are not interactive.
+  if (!required) {
+    return (
+      <span
+        className="flex h-7 w-7 items-center justify-center text-[14px] text-muted-foreground-strong/50"
+        aria-label="Not scheduled"
+      >
+        —
+      </span>
+    );
+  }
 
   function onClick() {
     if (future) return;
