@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import tailwindcssAnimate from "tailwindcss-animate";
 
 const config: Config = {
   darkMode: ["class"],
@@ -51,11 +52,27 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        kpi: {
+          green: "hsl(var(--kpi-green))",
+          orange: "hsl(var(--kpi-orange))",
+          red: "hsl(var(--kpi-red))",
+          purple: "hsl(var(--kpi-purple))",
+          violet: "hsl(var(--kpi-violet))",
+        },
+        violet: {
+          400: "hsl(var(--violet-400))",
+          500: "hsl(var(--violet-500))",
+          600: "hsl(var(--violet-600))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      backgroundImage: {
+        "gradient-violet":
+          "linear-gradient(135deg, hsl(var(--violet-600)), hsl(var(--violet-400)))",
       },
       keyframes: {
         "accordion-down": {
@@ -73,6 +90,6 @@ const config: Config = {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [tailwindcssAnimate],
 };
 export default config;

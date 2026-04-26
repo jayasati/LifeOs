@@ -62,6 +62,19 @@ enum SubscriptionCycle {
   YEARLY
 }
 
+enum PomodoroType {
+  FOCUS
+  SHORT_BREAK
+  LONG_BREAK
+  CUSTOM
+}
+
+enum IntegrationProvider {
+  GOOGLE_CALENDAR
+  GITHUB
+  LEETCODE
+}
+
 // --- Models ---
 
 model User {
@@ -73,18 +86,21 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tasks          Task[]
-  projects       Project[]
-  timeEntries    TimeEntry[]
-  categories     Category[]
-  habits         Habit[]
-  moodLogs       MoodLog[]
-  journalEntries JournalEntry[]
-  subjects       Subject[]
-  deadlines      Deadline[]
-  goals          Goal[]
-  expenses       Expense[]
-  subscriptions  Subscription[]
+  tasks            Task[]
+  projects         Project[]
+  timeEntries      TimeEntry[]
+  categories       Category[]
+  habits           Habit[]
+  moodLogs         MoodLog[]
+  journalEntries   JournalEntry[]
+  subjects         Subject[]
+  deadlines        Deadline[]
+  goals            Goal[]
+  expenses         Expense[]
+  subscriptions    Subscription[]
+  pomodoroSessions PomodoroSession[]
+  tags             Tag[]
+  integrations     Integration[]
 }
 
 model Task {
@@ -100,14 +116,16 @@ model Task {
   actualMinutes    Int?
   parentTaskId     String?
   projectId        String?
+  tags             String[]     @default([])
   createdAt        DateTime     @default(now())
   completedAt      DateTime?
 
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project     Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  parentTask  Task?       @relation("TaskSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
-  subtasks    Task[]      @relation("TaskSubtasks")
-  timeEntries TimeEntry[]
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project          Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parentTask       Task?             @relation("TaskSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  subtasks         Task[]            @relation("TaskSubtasks")
+  timeEntries      TimeEntry[]
+  pomodoroSessions PomodoroSession[]
 
   @@index([userId, status])
   @@index([userId, createdAt])
@@ -169,6 +187,8 @@ model Habit {
   frequency     HabitFrequency @default(DAILY)
   targetPerWeek Int?
   color         String?
+  currentStreak Int            @default(0)
+  longestStreak Int            @default(0)
   archivedAt    DateTime?
 
   user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -203,11 +223,15 @@ model MoodLog {
 }
 
 model JournalEntry {
-  id      String      @id @default(cuid())
-  userId  String
-  date    DateTime
-  content String
-  type    JournalType @default(DAILY)
+  id       String      @id @default(cuid())
+  userId   String
+  date     DateTime
+  title    String?
+  content  String
+  mood     Int?
+  imageUrl String?
+  tags     String[]    @default([])
+  type     JournalType @default(DAILY)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -291,4 +315,48 @@ model Subscription {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, nextRenewal])
+}
+
+model PomodoroSession {
+  id        String       @id @default(cuid())
+  userId    String
+  taskId    String?
+  type      PomodoroType
+  startedAt DateTime
+  endedAt   DateTime?
+  completed Boolean      @default(false)
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([userId, startedAt])
+  @@index([taskId])
+}
+
+model Tag {
+  id     String @id @default(cuid())
+  userId String
+  name   String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model Integration {
+  id           String              @id @default(cuid())
+  userId       String
+  provider     IntegrationProvider
+  accessToken  String
+  refreshToken String?
+  metadata     Json?
+  lastSyncedAt DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId])
 }
