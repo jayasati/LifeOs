@@ -9,9 +9,11 @@ import {
   getRecentIntegrationActivity,
 } from "@/features/integrations/server/queries";
 import { ConnectorCard } from "@/features/integrations/components/connector-card";
-import { TimeBreakdownDonut } from "@/features/integrations/components/time-breakdown-donut";
-import { GithubActivityBar } from "@/features/integrations/components/github-bar";
-import { LeetcodeProgress } from "@/features/integrations/components/leetcode-donut";
+import {
+  TimeBreakdownDonut,
+  GithubActivityBar,
+  LeetcodeProgress,
+} from "@/features/charts/lazy";
 import { ActivityFeed } from "@/features/integrations/components/activity-feed";
 import { BringEverythingTogetherCard } from "@/features/integrations/components/bring-everything-card";
 import { RedirectToast } from "@/features/integrations/components/redirect-toast";

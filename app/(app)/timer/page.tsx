@@ -13,7 +13,7 @@ import { TimerClock } from "@/features/timer/components/timer-clock";
 import { TodaysFocusCard } from "@/features/timer/components/todays-focus-card";
 import { CurrentTaskCard } from "@/features/timer/components/current-task-card";
 import { SessionsList } from "@/features/timer/components/sessions-list";
-import { FocusStatsChart } from "@/features/timer/components/focus-stats-chart";
+import { FocusStatsChart } from "@/features/charts/lazy";
 import { AchievementsCard } from "@/features/timer/components/achievements-card";
 import { HowItWorks } from "@/features/timer/components/how-it-works";
 import { FocusTipCard } from "@/features/timer/components/focus-tip-card";

@@ -8,15 +8,19 @@ import {
 } from "@/features/analytics/server/queries";
 import { RangeTabs } from "@/features/analytics/components/range-tabs";
 import { KpiStrip } from "@/features/analytics/components/kpi-strip";
-import { ProductivityOverview } from "@/features/analytics/components/productivity-overview";
-import { TimeDistributionDonut } from "@/features/analytics/components/time-distribution-donut";
-import { HabitSuccessBar } from "@/features/analytics/components/habit-success-bar";
-import { TaskCompletionDonut } from "@/features/analytics/components/task-completion-donut";
-import { ProductiveHoursBar } from "@/features/analytics/components/productive-hours-bar";
-import { MoodOverviewMini } from "@/features/analytics/components/mood-overview-mini";
 import { ProductivityHeatmap } from "@/features/analytics/components/productivity-heatmap";
 import { AiInsights } from "@/features/analytics/components/ai-insights";
 import { WeeklySummary } from "@/features/analytics/components/weekly-summary";
+// Recharts-heavy charts route through the lazy barrel so recharts is
+// code-split out of the route's initial JS bundle. See features/charts/lazy.
+import {
+  ProductivityOverview,
+  TimeDistributionDonut,
+  HabitSuccessBar,
+  TaskCompletionDonut,
+  ProductiveHoursBar,
+  MoodOverviewMini,
+} from "@/features/charts/lazy";
 
 type SP = Record<string, string | string[] | undefined>;
 const RANGES: AnalyticsRange[] = ["WEEK", "MONTH"];

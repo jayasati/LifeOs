@@ -2,7 +2,7 @@ import {
   type DashRange,
   getDashboardProductivity,
 } from "@/features/dashboard/server/queries";
-import { ProductivityChart } from "@/features/dashboard/components/productivity-chart";
+import { ProductivityChart } from "@/features/charts/lazy";
 import { ProductivityRangeTabs } from "@/features/dashboard/components/productivity-range-tabs";
 
 export async function ProductivityCard({ range }: { range: DashRange }) {

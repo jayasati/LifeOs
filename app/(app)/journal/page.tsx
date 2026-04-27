@@ -18,7 +18,7 @@ import {
 import { NewEntryButton } from "@/features/journal/components/new-entry-button";
 import { EntryCard } from "@/features/journal/components/entry-card";
 import { JournalCalendar } from "@/features/journal/components/journal-calendar";
-import { MoodOverviewDonut } from "@/features/journal/components/mood-overview-donut";
+import { MoodOverviewDonut } from "@/features/charts/lazy";
 import { JournalStatsCard } from "@/features/journal/components/journal-stats-card";
 import { DailyReflectionCard } from "@/features/journal/components/daily-reflection-card";
 

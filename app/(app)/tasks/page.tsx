@@ -21,7 +21,7 @@ import { NewTaskDialog } from "@/features/tasks/components/new-task-dialog";
 import { TaskTable } from "@/features/tasks/components/task-row";
 import { Pagination } from "@/features/tasks/components/pagination";
 import { MiniCalendar } from "@/features/tasks/components/mini-calendar";
-import { TaskSummaryDonut } from "@/features/tasks/components/task-summary-donut";
+import { TaskSummaryDonut } from "@/features/charts/lazy";
 import { FilterPanel } from "@/features/tasks/components/filter-panel";
 import { DailyProgressCard } from "@/features/tasks/components/daily-progress-card";
 import { SidebarBottomSlot } from "@/lib/sidebar-slot";

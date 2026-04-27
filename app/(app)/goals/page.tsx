@@ -20,7 +20,7 @@ import { FilterTabs } from "@/features/goals/components/filter-tabs";
 import { SortButton } from "@/features/goals/components/sort-button";
 import { GoalDialog } from "@/features/goals/components/goal-dialog";
 import { GoalCard } from "@/features/goals/components/goal-card";
-import { GoalsOverviewDonut } from "@/features/goals/components/goals-overview-donut";
+import { GoalsOverviewDonut } from "@/features/charts/lazy";
 import { UpcomingDeadlinesCard } from "@/features/goals/components/upcoming-deadlines-card";
 import { GoalStreakHeatmap } from "@/features/goals/components/goal-streak-heatmap";
 import { TipsCard } from "@/features/goals/components/tips-card";
