@@ -1,5 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { Sidebar } from "@/components/sidebar";
+import { MobileNav } from "@/components/mobile-nav";
 import { PersistentTopRight } from "@/components/persistent-top-right";
 import { SidebarSlotProvider } from "@/lib/sidebar-slot";
 import { TimerProvider } from "@/features/timer/components/timer-provider";
@@ -25,6 +26,7 @@ export default function AppLayout({
             <Sidebar />
           </div>
           <main className="relative min-w-0 overflow-x-hidden">
+            <MobileNav />
             <PersistentTopRight />
             {children}
           </main>
