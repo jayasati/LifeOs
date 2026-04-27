@@ -21,7 +21,17 @@ export type IntegrationRow = {
 // queries below all need this data.
 const loadIntegrationRows = cache(async (): Promise<IntegrationRow[]> => {
   const userId = await requireDbUserId();
-  const rows = await db.integration.findMany({ where: { userId } });
+  // Only the fields the UI consumes — explicitly excludes accessToken /
+  // refreshToken so secrets aren't shuttled into the React tree or the
+  // per-request cache. Sync code reaches for tokens via dedicated lookups.
+  const rows = await db.integration.findMany({
+    where: { userId },
+    select: {
+      provider: true,
+      lastSyncedAt: true,
+      metadata: true,
+    },
+  });
   const map = new Map<Provider, IntegrationRow>();
   for (const r of rows) {
     map.set(r.provider as Provider, {

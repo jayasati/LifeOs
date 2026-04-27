@@ -61,7 +61,18 @@ export const getHabitsWithWeek = cache(
     const habits = await db.habit.findMany({
       where: { userId, archivedAt: null },
       orderBy: { createdAt: "asc" },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        icon: true,
+        color: true,
+        frequency: true,
+        targetPerWeek: true,
+        customDays: true,
+        currentStreak: true,
+        longestStreak: true,
+        createdAt: true,
         logs: {
           where: { date: { gte: wkStart, lte: wkEnd }, completed: true },
           select: { date: true },

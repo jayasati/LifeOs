@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireDbUserId } from "@/features/tasks/server/queries";
+import { bumpTag } from "@/lib/cache-tags";
 import {
   createEntrySchema,
   updateEntrySchema,
@@ -35,6 +36,7 @@ export async function createEntry(input: CreateEntryInput): Promise<string> {
     select: { id: true },
   });
   await syncTags(userId, data.tags);
+  bumpTag("analytics", "tags");
   revalidatePath("/journal");
   return entry.id;
 }
@@ -53,6 +55,7 @@ export async function updateEntry(input: UpdateEntryInput) {
     },
   });
   await syncTags(userId, data.tags);
+  bumpTag("analytics", "tags");
   revalidatePath("/journal");
   revalidatePath(`/journal/${data.id}`);
 }
@@ -60,6 +63,7 @@ export async function updateEntry(input: UpdateEntryInput) {
 export async function deleteEntry(id: string) {
   const userId = await requireDbUserId();
   await db.journalEntry.delete({ where: { id, userId } });
+  bumpTag("analytics");
   revalidatePath("/journal");
   redirect("/journal");
 }

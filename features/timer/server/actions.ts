@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireDbUserId } from "@/features/tasks/server/queries";
+import { bumpTag } from "@/lib/cache-tags";
 
 const TYPE_MAP: Record<
   "POMODORO" | "SHORT" | "LONG" | "CUSTOM",
@@ -33,6 +34,7 @@ export async function logSession(input: {
       completed: true,
     },
   });
+  bumpTag("analytics");
   revalidatePath("/timer");
   revalidatePath("/dashboard");
 }

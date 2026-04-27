@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import {
   addDays,
   endOfDay,
@@ -75,6 +76,14 @@ export const getEntryById = cache(async (id: string) => {
   const userId = await requireDbUserId();
   return db.journalEntry.findFirst({
     where: { id, userId },
+    select: {
+      id: true,
+      title: true,
+      content: true,
+      mood: true,
+      imageUrl: true,
+      tags: true,
+    },
   });
 });
 
@@ -208,15 +217,23 @@ export const getEntryDays = cache(
   },
 );
 
+const _getJournalDistinctTagsCached = unstable_cache(
+  async (userId: string): Promise<string[]> => {
+    const rows = await db.journalEntry.findMany({
+      where: { userId },
+      select: { tags: true },
+    });
+    const set = new Set<string>();
+    for (const r of rows) for (const t of r.tags) set.add(t);
+    return [...set].sort();
+  },
+  ["journal-distinct-tags"],
+  { tags: ["tags"], revalidate: 300 },
+);
+
 export const getDistinctTags = cache(async (): Promise<string[]> => {
   const userId = await requireDbUserId();
-  const rows = await db.journalEntry.findMany({
-    where: { userId },
-    select: { tags: true },
-  });
-  const set = new Set<string>();
-  for (const r of rows) for (const t of r.tags) set.add(t);
-  return [...set].sort();
+  return _getJournalDistinctTagsCached(userId);
 });
 
 // Suppress unused import warning while keeping endOfDay imported for potential future use

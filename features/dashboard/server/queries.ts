@@ -52,6 +52,61 @@ export type HabitTrackerSummary = {
   }[];
 };
 
+// ─── Shared per-request loaders ──────────────────────────────────────────────
+// KPIs / Today Focus / Habit Tracker cards all need the same active-habit list
+// + today's habit logs + week's habit logs. Without these shared cached
+// helpers each Suspense section re-issues the same queries (3× round-trips
+// per dashboard render).
+const loadActiveHabits = cache(async () => {
+  const userId = await requireDbUserId();
+  return db.habit.findMany({
+    where: { userId, archivedAt: null },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      name: true,
+      icon: true,
+      color: true,
+      frequency: true,
+      customDays: true,
+      targetPerWeek: true,
+      currentStreak: true,
+      createdAt: true,
+    },
+  });
+});
+
+// We pull the entire current week so HabitTracker can derive weekly stats,
+// and KPIs / TodayFocus filter down to today in memory — much cheaper than
+// three separate range queries.
+const loadHabitLogsThisWeek = cache(async () => {
+  const userId = await requireDbUserId();
+  const now = new Date();
+  const wkStart = startOfWeek(now, { weekStartsOn: 1 });
+  const wkEnd = endOfWeek(now, { weekStartsOn: 1 });
+  return db.habitLog.findMany({
+    where: {
+      completed: true,
+      date: { gte: wkStart, lte: wkEnd },
+      habit: { userId, archivedAt: null },
+    },
+    select: { date: true, habitId: true },
+  });
+});
+
+function filterToToday<T extends { date: Date }>(
+  rows: T[],
+  startToday: Date,
+  endToday: Date,
+): T[] {
+  const lo = startToday.getTime();
+  const hi = endToday.getTime();
+  return rows.filter((r) => {
+    const t = r.date.getTime();
+    return t >= lo && t <= hi;
+  });
+}
+
 // ─── KPIs ────────────────────────────────────────────────────────────────────
 export const getDashboardKpis = cache(async (): Promise<DashboardKpis> => {
   const userId = await requireDbUserId();
@@ -59,7 +114,7 @@ export const getDashboardKpis = cache(async (): Promise<DashboardKpis> => {
   const startToday = startOfDay(now);
   const endToday = endOfDay(now);
 
-  const [completedToday, overdue, habits, todayLogs] = await Promise.all([
+  const [completedToday, overdue, habits, weekLogs] = await Promise.all([
     db.task.count({
       where: {
         userId,
@@ -70,25 +125,10 @@ export const getDashboardKpis = cache(async (): Promise<DashboardKpis> => {
     db.task.count({
       where: { userId, status: { not: "DONE" }, dueDate: { lt: now } },
     }),
-    db.habit.findMany({
-      where: { userId, archivedAt: null },
-      select: {
-        id: true,
-        frequency: true,
-        customDays: true,
-        currentStreak: true,
-        createdAt: true,
-      },
-    }),
-    db.habitLog.findMany({
-      where: {
-        completed: true,
-        date: { gte: startToday, lte: endToday },
-        habit: { userId, archivedAt: null },
-      },
-      select: { habitId: true },
-    }),
+    loadActiveHabits(),
+    loadHabitLogsThisWeek(),
   ]);
+  const todayLogs = filterToToday(weekLogs, startToday, endToday);
 
   const todayWeekday = (getDay(startToday) + 6) % 7; // Mon=0..Sun=6
   const completedHabitIds = new Set(todayLogs.map((l) => l.habitId));
@@ -125,7 +165,7 @@ export const getTodayFocusSummary = cache(
     const startToday = startOfDay(now);
     const endToday = endOfDay(now);
 
-    const [tasksPending, tasksPendingHigh, habits, todayLogs] = await Promise.all([
+    const [tasksPending, tasksPendingHigh, habits, weekLogs] = await Promise.all([
       db.task.count({
         where: {
           userId,
@@ -141,24 +181,10 @@ export const getTodayFocusSummary = cache(
           OR: [{ dueDate: null }, { dueDate: { gte: now } }],
         },
       }),
-      db.habit.findMany({
-        where: { userId, archivedAt: null },
-        select: {
-          id: true,
-          frequency: true,
-          customDays: true,
-          createdAt: true,
-        },
-      }),
-      db.habitLog.findMany({
-        where: {
-          completed: true,
-          date: { gte: startToday, lte: endToday },
-          habit: { userId, archivedAt: null },
-        },
-        select: { habitId: true },
-      }),
+      loadActiveHabits(),
+      loadHabitLogsThisWeek(),
     ]);
+    const todayLogs = filterToToday(weekLogs, startToday, endToday);
 
     const todayWeekday = (getDay(startToday) + 6) % 7;
     const completedSet = new Set(todayLogs.map((l) => l.habitId));
@@ -232,46 +258,17 @@ export const getTimeTrackedSummary = cache(
 // ─── Habit Tracker Summary (top 3 + today percent) ───────────────────────────
 export const getHabitTrackerSummary = cache(
   async (): Promise<HabitTrackerSummary> => {
-    const userId = await requireDbUserId();
+    // userId not needed here — the shared loaders resolve it themselves.
     const now = new Date();
     const startToday = startOfDay(now);
     const endToday = endOfDay(now);
     const wkStart = startOfWeek(now, { weekStartsOn: 1 });
-    const wkEnd = endOfWeek(now, { weekStartsOn: 1 });
 
-    const [habits, weekLogs, todayLogs] = await Promise.all([
-      db.habit.findMany({
-        where: { userId, archivedAt: null },
-        orderBy: { createdAt: "asc" },
-        select: {
-          id: true,
-          name: true,
-          icon: true,
-          color: true,
-          frequency: true,
-          customDays: true,
-          targetPerWeek: true,
-          createdAt: true,
-          currentStreak: true,
-        },
-      }),
-      db.habitLog.findMany({
-        where: {
-          completed: true,
-          date: { gte: wkStart, lte: wkEnd },
-          habit: { userId, archivedAt: null },
-        },
-        select: { date: true, habitId: true },
-      }),
-      db.habitLog.findMany({
-        where: {
-          completed: true,
-          date: { gte: startToday, lte: endToday },
-          habit: { userId, archivedAt: null },
-        },
-        select: { habitId: true },
-      }),
+    const [habits, weekLogs] = await Promise.all([
+      loadActiveHabits(),
+      loadHabitLogsThisWeek(),
     ]);
+    const todayLogs = filterToToday(weekLogs, startToday, endToday);
 
     const todayWeekday = (getDay(startToday) + 6) % 7;
     const completedTodaySet = new Set(todayLogs.map((l) => l.habitId));

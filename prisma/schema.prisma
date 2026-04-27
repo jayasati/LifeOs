@@ -4,6 +4,9 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // Prisma 7 moved url + directUrl out of schema.prisma. They live in
+  // prisma.config.ts (`datasource.url` = migration URL) and lib/db.ts
+  // (the PrismaPg adapter, which reads DATABASE_URL = pooled runtime URL).
 }
 
 // --- Enums ---
@@ -132,6 +135,11 @@ model Task {
   @@index([userId, status])
   @@index([userId, createdAt])
   @@index([userId, dueDate])
+  // Hot path for "overdue" / "pending today" lists which filter status AND
+  // dueDate together (features/tasks, features/dashboard).
+  @@index([userId, status, dueDate])
+  // Analytics + dashboard + sidebar pulse all range-scan by completedAt.
+  @@index([userId, completedAt])
   @@index([projectId])
   @@index([parentTaskId])
 }
@@ -357,6 +365,9 @@ model PomodoroSession {
   task Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
 
   @@index([userId, startedAt])
+  // Analytics + timer queries always combine type IN (...) with startedAt
+  // ranges — this index lets Postgres prune by type before the date scan.
+  @@index([userId, type, startedAt])
   @@index([taskId])
 }
 

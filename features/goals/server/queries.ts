@@ -48,9 +48,24 @@ export const getGoals = cache(
 
     const rows = await db.goal.findMany({
       where: { userId },
-      include: {
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        category: true,
+        icon: true,
+        color: true,
+        endDate: true,
+        startedAt: true,
+        createdAt: true,
         milestones: {
           orderBy: { position: "asc" },
+          select: {
+            id: true,
+            title: true,
+            completedAt: true,
+            position: true,
+          },
         },
       },
       orderBy:
@@ -146,7 +161,11 @@ export const getUpcomingDeadlines = cache(
       },
       orderBy: { endDate: "asc" },
       take: limit * 2, // we'll filter out completed in JS via milestones
-      include: {
+      select: {
+        id: true,
+        title: true,
+        category: true,
+        endDate: true,
         milestones: { select: { completedAt: true } },
       },
     });

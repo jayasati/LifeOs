@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import {
   addDays,
   addMonths,
@@ -61,7 +62,8 @@ export type Analytics = {
   productiveHours: { hour: number; minutes: number }[];
   productiveHoursPeak: { startHour: number; endHour: number } | null;
   moodOverview: { mood: string; count: number; pct: number; color: string; emoji: string }[];
-  heatmap: { date: string; score: number }[]; // 365 cells
+  // Heatmap moved to its own slim getAnalyticsHeatmap() — not on Analytics
+  // anymore so the main pipeline doesn't pull a year of data per render.
   aiInsights: { emoji: string; title: string; body: string }[];
   weeklySummary: {
     tasks: number;
@@ -93,15 +95,26 @@ function rangeBounds(
   return { from: addMonths(startOfMonth(now), -11), to: endOfMonth(now) };
 }
 
-export const getAnalytics = cache(
-  async (opts: {
-    range?: AnalyticsRange;
-    from?: Date;
-    to?: Date;
-  } = {}): Promise<Analytics> => {
-    const userId = await requireDbUserId();
-    const range: AnalyticsRange = opts.range ?? "WEEK";
-    const { from, to } = rangeBounds(range, opts.from, opts.to);
+// React cache() compares args with Object.is — passing { range } from the
+// page creates a fresh object each call, so the cache always misses and the
+// pipeline runs once per Suspense section. We key the cache on primitives
+// instead and expose the original object signature as a thin wrapper.
+//
+// Cross-request layer: unstable_cache keeps results across renders for 60s,
+// invalidated by bumpTag('analytics') in any task/habit/journal/session
+// mutation. userId is part of keyParts so each user's cache is isolated.
+const _getAnalyticsCoreCached = unstable_cache(
+  async (
+    userId: string,
+    range: AnalyticsRange,
+    fromMs: number | null,
+    toMs: number | null,
+  ): Promise<Analytics> => {
+    const { from, to } = rangeBounds(
+      range,
+      fromMs != null ? new Date(fromMs) : undefined,
+      toMs != null ? new Date(toMs) : undefined,
+    );
 
     // Previous period for deltas (same length, immediately before).
     const periodMs = to.getTime() - from.getTime();
@@ -109,9 +122,9 @@ export const getAnalytics = cache(
     const prevFrom = new Date(prevTo.getTime() - periodMs);
 
     const today = startOfDay(new Date());
-    const yearAgo = subDays(today, 364);
 
-    // Pull all the raw data in parallel.
+    // Pull all the raw data in parallel. (Heatmap moved to getAnalyticsHeatmap
+    // so this pipeline doesn't pay for 365 days of data on every render.)
     const [
       tasksInRange,
       tasksPrev,
@@ -123,9 +136,6 @@ export const getAnalytics = cache(
       sessionsHourBucket,
       journalRange,
       journalPrev,
-      heatmapTasks,
-      heatmapHabitLogs,
-      heatmapSessions,
     ] = await Promise.all([
       db.task.findMany({
         where: { userId, completedAt: { gte: from, lte: to } },
@@ -190,27 +200,6 @@ export const getAnalytics = cache(
       }),
       db.journalEntry.count({
         where: { userId, date: { gte: prevFrom, lte: prevTo } },
-      }),
-      db.task.findMany({
-        where: { userId, completedAt: { gte: yearAgo } },
-        select: { completedAt: true },
-      }),
-      db.habitLog.findMany({
-        where: {
-          completed: true,
-          date: { gte: yearAgo },
-          habit: { userId, archivedAt: null },
-        },
-        select: { date: true },
-      }),
-      db.pomodoroSession.findMany({
-        where: {
-          userId,
-          completed: true,
-          type: { in: ["FOCUS", "CUSTOM"] },
-          startedAt: { gte: yearAgo },
-        },
-        select: { startedAt: true, endedAt: true },
       }),
     ]);
 
@@ -418,18 +407,6 @@ export const getAnalytics = cache(
       color: m.color,
     }));
 
-    // ─── Heatmap (365 days back) ─────────────────────────────────────────────
-    const heatmap = computeHeatmap({
-      tasks: heatmapTasks.map((t) => t.completedAt!).filter(Boolean),
-      habits: heatmapHabitLogs.map((l) => l.date),
-      sessions: heatmapSessions
-        .filter((s) => s.endedAt)
-        .map((s) => ({
-          start: s.startedAt,
-          minutes: (s.endedAt!.getTime() - s.startedAt.getTime()) / 60_000,
-        })),
-    });
-
     // ─── AI Insights (heuristic) ─────────────────────────────────────────────
     const aiInsights = computeInsights({
       productivityOverview,
@@ -509,12 +486,90 @@ export const getAnalytics = cache(
       productiveHours,
       productiveHoursPeak: peak,
       moodOverview,
-      heatmap,
       aiInsights,
       weeklySummary,
     };
   },
+  ["analytics-core"],
+  { tags: ["analytics"], revalidate: 60 },
 );
+
+// Per-render dedup on top of the cross-request cache. Without this, two
+// Suspense sections that both call getAnalytics() inside the same render
+// would each call into unstable_cache (cheap but not free).
+const _getAnalyticsRequest = cache(
+  (userId: string, range: AnalyticsRange, fromMs: number | null, toMs: number | null) =>
+    _getAnalyticsCoreCached(userId, range, fromMs, toMs),
+);
+
+export async function getAnalytics(opts: {
+  range?: AnalyticsRange;
+  from?: Date;
+  to?: Date;
+} = {}): Promise<Analytics> {
+  const userId = await requireDbUserId();
+  return _getAnalyticsRequest(
+    userId,
+    opts.range ?? "WEEK",
+    opts.from ? opts.from.getTime() : null,
+    opts.to ? opts.to.getTime() : null,
+  );
+}
+
+// Heatmap is range-agnostic (always trailing 365 days) — calling getAnalytics
+// just to pull a.heatmap forces the full KPI/chart pipeline. This dedicated
+// path runs only the 3 queries the heatmap actually needs, with the same
+// 'analytics' cross-request tag.
+const _getAnalyticsHeatmapCached = unstable_cache(
+  async (
+    userId: string,
+  ): Promise<{ date: string; score: number }[]> => {
+    const today = startOfDay(new Date());
+    const yearAgo = subDays(today, 364);
+
+    const [tasks, habitLogs, sessions] = await Promise.all([
+      db.task.findMany({
+        where: { userId, completedAt: { gte: yearAgo } },
+        select: { completedAt: true },
+      }),
+      db.habitLog.findMany({
+        where: {
+          completed: true,
+          date: { gte: yearAgo },
+          habit: { userId, archivedAt: null },
+        },
+        select: { date: true },
+      }),
+      db.pomodoroSession.findMany({
+        where: {
+          userId,
+          completed: true,
+          type: { in: ["FOCUS", "CUSTOM"] },
+          startedAt: { gte: yearAgo },
+        },
+        select: { startedAt: true, endedAt: true },
+      }),
+    ]);
+
+    return computeHeatmap({
+      tasks: tasks.map((t) => t.completedAt!).filter(Boolean),
+      habits: habitLogs.map((l) => l.date),
+      sessions: sessions
+        .filter((s) => s.endedAt)
+        .map((s) => ({
+          start: s.startedAt,
+          minutes: (s.endedAt!.getTime() - s.startedAt.getTime()) / 60_000,
+        })),
+    });
+  },
+  ["analytics-heatmap"],
+  { tags: ["analytics"], revalidate: 60 },
+);
+
+export const getAnalyticsHeatmap = cache(async () => {
+  const userId = await requireDbUserId();
+  return _getAnalyticsHeatmapCached(userId);
+});
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

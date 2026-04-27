@@ -1,4 +1,6 @@
 import "server-only";
+import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { addDays, format, startOfDay, subDays } from "date-fns";
 import { db } from "@/lib/db";
 import { requireDbUserId } from "@/features/tasks/server/queries";
@@ -51,9 +53,9 @@ function avgRange(byDay: Map<string, number>, from: Date, days: number): number 
   return sum / days;
 }
 
-export async function getProductivityPulse(): Promise<ProductivityPulse> {
-  const userId = await requireDbUserId();
-  const today = startOfDay(new Date());
+const _getProductivityPulseCached = unstable_cache(
+  async (userId: string): Promise<ProductivityPulse> => {
+    const today = startOfDay(new Date());
   // We need 8 weeks (56 days) for the sparkline AND a 30-day window before
   // that for the previous-period comparison. So pull 86 days total.
   const windowStart = subDays(today, 85);
@@ -90,12 +92,20 @@ export async function getProductivityPulse(): Promise<ProductivityPulse> {
       ? null
       : Math.round(((score - prevScore) / prevScore) * 100);
 
-  // 8 weekly averages, oldest → newest, ending on today.
-  const sparkline: number[] = [];
-  for (let w = 7; w >= 0; w--) {
-    const wkStart = subDays(today, w * 7 + 6);
-    sparkline.push(Math.round(avgRange(byDay, wkStart, 7)));
-  }
+    // 8 weekly averages, oldest → newest, ending on today.
+    const sparkline: number[] = [];
+    for (let w = 7; w >= 0; w--) {
+      const wkStart = subDays(today, w * 7 + 6);
+      sparkline.push(Math.round(avgRange(byDay, wkStart, 7)));
+    }
 
-  return { score, deltaPct, sparkline };
-}
+    return { score, deltaPct, sparkline };
+  },
+  ["productivity-pulse"],
+  { tags: ["analytics"], revalidate: 60 },
+);
+
+export const getProductivityPulse = cache(async () => {
+  const userId = await requireDbUserId();
+  return _getProductivityPulseCached(userId);
+});

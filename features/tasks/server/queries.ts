@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import {
@@ -156,6 +157,16 @@ export async function getTasks(opts: {
       orderBy,
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
+      select: {
+        id: true,
+        title: true,
+        priority: true,
+        status: true,
+        dueDate: true,
+        tags: true,
+        completedAt: true,
+        createdAt: true,
+      },
     }),
     db.task.count({ where }),
   ]);
@@ -242,13 +253,21 @@ export const getTaskDueDates = cache(async (opts: {
 });
 
 // ─── Distinct tags for the filter dropdown ───────────────────────────────────
+const _getDistinctTagsCached = unstable_cache(
+  async (userId: string): Promise<string[]> => {
+    const rows = await db.task.findMany({
+      where: { userId },
+      select: { tags: true },
+    });
+    const set = new Set<string>();
+    for (const r of rows) for (const t of r.tags) set.add(t);
+    return [...set].sort();
+  },
+  ["tasks-distinct-tags"],
+  { tags: ["tags"], revalidate: 300 },
+);
+
 export const getDistinctTags = cache(async (): Promise<string[]> => {
   const userId = await requireDbUserId();
-  const rows = await db.task.findMany({
-    where: { userId },
-    select: { tags: true },
-  });
-  const set = new Set<string>();
-  for (const r of rows) for (const t of r.tags) set.add(t);
-  return [...set].sort();
+  return _getDistinctTagsCached(userId);
 });

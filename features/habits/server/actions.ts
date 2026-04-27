@@ -9,6 +9,7 @@ import {
 } from "date-fns";
 import { db } from "@/lib/db";
 import { requireDbUserId } from "@/features/tasks/server/queries";
+import { bumpTag } from "@/lib/cache-tags";
 import {
   createHabitSchema,
   type CreateHabitInput,
@@ -235,6 +236,7 @@ export async function toggleHabitLog(habitId: string, date: Date) {
     });
   });
 
+  bumpTag("analytics");
   revalidatePath("/habits");
 }
 
@@ -254,6 +256,7 @@ export async function createHabit(input: CreateHabitInput) {
       customDays: data.frequency === "CUSTOM" ? data.customDays : [],
     },
   });
+  bumpTag("analytics");
   revalidatePath("/habits");
 }
 
@@ -295,6 +298,7 @@ export async function updateHabit(input: CreateHabitInput & { id: string }) {
     });
   });
 
+  bumpTag("analytics");
   revalidatePath("/habits");
 }
 
@@ -304,5 +308,6 @@ export async function archiveHabit(id: string) {
     where: { id, userId },
     data: { archivedAt: new Date() },
   });
+  bumpTag("analytics");
   revalidatePath("/habits");
 }

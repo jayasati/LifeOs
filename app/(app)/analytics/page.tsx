@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   type AnalyticsRange,
   getAnalytics,
+  getAnalyticsHeatmap,
 } from "@/features/analytics/server/queries";
 import { RangeTabs } from "@/features/analytics/components/range-tabs";
 import { KpiStrip } from "@/features/analytics/components/kpi-strip";
@@ -159,9 +160,10 @@ async function MoodSection({ range }: { range: AnalyticsRange }) {
 }
 
 async function HeatmapSection() {
-  // Heatmap is always 365 days regardless of range tab.
-  const a = await getAnalytics({ range: "WEEK" });
-  return <ProductivityHeatmap cells={a.heatmap} />;
+  // Heatmap is always 365 days regardless of range tab — use the slim path
+  // so we don't run the entire WEEK pipeline just for the heatmap field.
+  const cells = await getAnalyticsHeatmap();
+  return <ProductivityHeatmap cells={cells} />;
 }
 
 async function InsightsSection({ range }: { range: AnalyticsRange }) {

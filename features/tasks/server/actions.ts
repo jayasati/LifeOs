@@ -10,6 +10,7 @@ import {
   type UpdateTaskInput,
 } from "@/features/tasks/schema";
 import { requireDbUserId } from "@/features/tasks/server/queries";
+import { bumpTag } from "@/lib/cache-tags";
 
 export async function createTask(input: CreateTaskInput) {
   const userId = await requireDbUserId();
@@ -26,6 +27,7 @@ export async function createTask(input: CreateTaskInput) {
       status: "TODO",
     },
   });
+  bumpTag("analytics", "tags");
   revalidatePath("/tasks");
 }
 
@@ -49,6 +51,7 @@ export async function updateTask(input: UpdateTaskInput) {
         : {}),
     },
   });
+  bumpTag("analytics", "tags");
   revalidatePath("/tasks");
 }
 
@@ -60,11 +63,13 @@ export async function toggleTask(id: string, completed: boolean) {
       ? { status: "DONE", completedAt: new Date() }
       : { status: "TODO", completedAt: null },
   });
+  bumpTag("analytics", "tags");
   revalidatePath("/tasks");
 }
 
 export async function deleteTask(id: string) {
   const userId = await requireDbUserId();
   await db.task.delete({ where: { id, userId } });
+  bumpTag("analytics", "tags");
   revalidatePath("/tasks");
 }
