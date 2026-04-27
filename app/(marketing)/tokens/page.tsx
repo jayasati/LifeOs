@@ -1,3 +1,6 @@
+// Pure design-system reference page — no user data, no DB. Prerender it.
+export const dynamic = "force-static";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,

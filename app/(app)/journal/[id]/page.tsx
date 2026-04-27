@@ -12,11 +12,12 @@ export default async function EditJournalPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [entry, knownTags] = await Promise.all([
-    getEntryById(id),
-    getDistinctTags(),
-  ]);
+  // Block on the entry (we need its title for the page header). Pass tags
+  // as an UNawaited Promise — the editor unwraps it via use() inside a
+  // <Suspense> boundary, so suggestions don't gate TTFB.
+  const entry = await getEntryById(id);
   if (!entry) notFound();
+  const knownTagsPromise = getDistinctTags();
   return (
     <div className="flex h-screen flex-col">
       <PageHeader
@@ -26,7 +27,7 @@ export default async function EditJournalPage({
       <div className="flex-1 overflow-y-auto">
         <EntryEditor
           mode="edit"
-          knownTags={knownTags}
+          knownTagsPromise={knownTagsPromise}
           initial={{
             id: entry.id,
             title: entry.title,

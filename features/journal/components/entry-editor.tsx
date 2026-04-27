@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { Suspense, use, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -28,11 +28,15 @@ type Initial = {
 export function EntryEditor({
   mode,
   initial,
-  knownTags,
+  knownTagsPromise,
 }: {
   mode: "create" | "edit";
   initial?: Initial;
-  knownTags: string[];
+  // The page passes this WITHOUT awaiting so it doesn't block TTFB. The
+  // <TagSuggestions> child unwraps it via React 19's use() inside a Suspense
+  // boundary — suggestions appear when the query resolves; everything else
+  // paints immediately.
+  knownTagsPromise: Promise<string[]>;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(initial?.title ?? "");
@@ -122,8 +126,9 @@ export function EntryEditor({
             imageUrl: imageUrl ?? null,
             tags,
           });
+          // updateEntry calls revalidatePath('/journal') + the entry page —
+          // the next navigation reads fresh data, no router.refresh() needed.
           router.push(`/journal`);
-          router.refresh();
         } else {
           const id = await createEntry({
             title: title.trim() || null,
@@ -133,7 +138,6 @@ export function EntryEditor({
             tags,
           });
           router.push(`/journal/${id}`);
-          router.refresh();
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Save failed");
@@ -149,10 +153,6 @@ export function EntryEditor({
       await deleteEntry(initial.id);
     });
   }
-
-  const tagSuggestions = knownTags.filter(
-    (t) => !tags.includes(t) && (!tagInput || t.toLowerCase().includes(tagInput.toLowerCase())),
-  );
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 pb-8 pt-4 sm:px-6">
@@ -277,22 +277,18 @@ export function EntryEditor({
             className="min-w-[120px] flex-1 bg-transparent px-1 py-0.5 text-[12.5px] outline-none placeholder:text-muted-foreground-strong"
           />
         </div>
-        {tagSuggestions.length > 0 && tagInput && (
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {tagSuggestions.slice(0, 6).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => {
-                  addTag(t);
-                  setTagInput("");
-                }}
-                className="rounded-md border border-dashed border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-primary/10 hover:text-foreground"
-              >
-                + {t}
-              </button>
-            ))}
-          </div>
+        {tagInput && (
+          <Suspense fallback={null}>
+            <TagSuggestions
+              promise={knownTagsPromise}
+              input={tagInput}
+              applied={tags}
+              onPick={(t) => {
+                addTag(t);
+                setTagInput("");
+              }}
+            />
+          </Suspense>
         )}
       </div>
 
@@ -365,6 +361,42 @@ export function EntryEditor({
           <div className="text-[11px] text-kpi-red">{uploadError}</div>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+// Suspends only the suggestions chip row — everything else in the editor
+// renders immediately. Once the tags Promise resolves the row pops in;
+// fallback is null so there's no shimmer.
+function TagSuggestions({
+  promise,
+  input,
+  applied,
+  onPick,
+}: {
+  promise: Promise<string[]>;
+  input: string;
+  applied: string[];
+  onPick: (t: string) => void;
+}) {
+  const knownTags = use(promise);
+  const lower = input.toLowerCase();
+  const suggestions = knownTags.filter(
+    (t) => !applied.includes(t) && t.toLowerCase().includes(lower),
+  );
+  if (suggestions.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5 pt-1">
+      {suggestions.slice(0, 6).map((t) => (
+        <button
+          key={t}
+          type="button"
+          onClick={() => onPick(t)}
+          className="rounded-md border border-dashed border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-primary/10 hover:text-foreground"
+        >
+          + {t}
+        </button>
+      ))}
     </div>
   );
 }

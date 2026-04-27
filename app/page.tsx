@@ -1,7 +1,5 @@
 import Link from "next/link";
 import Image from "next/image";
-import { redirect } from "next/navigation";
-import { auth } from "@clerk/nextjs/server";
 import {
   Zap,
   Sparkles,
@@ -15,10 +13,13 @@ import {
   Star,
 } from "lucide-react";
 
-export default async function HeroPage() {
-  const { userId } = await auth();
-  if (userId) redirect("/dashboard");
+// Marketing landing page — same HTML for everyone who isn't logged in.
+// Logged-in users get redirected by middleware (proxy.ts) so we never reach
+// this component. force-static lets Next prerender it at build and serve
+// from the CDN.
+export const dynamic = "force-static";
 
+export default function HeroPage() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-background">
       {/* subtle ambient glow — kept light to avoid AI-template look */}

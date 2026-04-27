@@ -4,6 +4,11 @@ import { HelpContent } from "@/features/help/components/help-content";
 import { SupportRail } from "@/features/help/components/support-rail";
 import { HereToHelpCard } from "@/features/help/components/here-to-help-card";
 
+// /help has no per-user state, no auth checks, no DB queries — it's the same
+// HTML for everyone. Force-static prerenders it at build and serves from the
+// CDN edge instead of running the Node renderer per request.
+export const dynamic = "force-static";
+
 export default function HelpPage() {
   return (
     <div className="flex h-screen flex-col">
